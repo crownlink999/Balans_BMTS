@@ -273,7 +273,7 @@ function gkey(code,name){return /без\s*кода/i.test(code)?'без кода
 
 var CFG={res:{c:4,n:5,u:6,q:7},bal:{c:0,n:1,u:2,q:4},vir:{c:0,n:1,u:2,q:4},me:{c:3,n:4,u:5,q:8}};
 var D=null,H={},F={},Y={},G={},MEBY={},RESBY={},BALSUM={},BALBY={};
-var APP_BUILD={v:'8',t:'21.11.2026 13:54'};
+var APP_BUILD={v:'9',t:'21.11.2026 15:01'};
 var S={sec:'bms',tab:'bal',q:{me:'',bms:''},plans:{},rem:'',years:{},shop:'',shopRes:'',yOpen:false,limit:50,open:{},unfold:{}};
 try{var sv=localStorage.getItem('bmts_sec');if(sv==='me'||sv==='bms')S.sec=sv}catch(e){}
 var $q=document.getElementById('q'),$clr=document.getElementById('clr'),$main=document.getElementById('main'),
@@ -612,15 +612,31 @@ function dropEmptyCols(rows){
   return rows.map(function(r){return keep.map(function(j){return r[j]})});
 }
 function tableHead(statH,tab,idx){
-  S.copyText=buildTable(tab,idx);S.copyN=idx.length;
+  S.copyText=function(){return buildTable(tab,idx)};S.copyN=idx.length;
   return '<div class="lhead">'+statH+'<button class="copybtn" data-copy="1" data-label="Скопировать для Excel">Скопировать для Excel</button></div>';
 }
-function shortTable(found,m,L){
+function shortTable(items,L){
   /* кратко: код, наименование, сумма (для баланса это доступный запас), ед. изм. */
   var lab=L.lab.charAt(0).toUpperCase()+L.lab.slice(1);
-  return [['Код материала','Наименование',lab,'Ед. изм.'].join('\t')].concat(found.map(function(c){
-    var g=m[c];return [c,tcell(g.name),tnum(g.sum),tcell(g.unit)].join('\t');
+  return [['Код материала','Наименование',lab,'Ед. изм.'].join('\t')].concat(items.map(function(g){
+    return [g.code,tcell(g.name),tnum(g.sum),tcell(g.unit)].join('\t');
   })).join('\n');
+}
+function summarize(tab,idx){
+  var L=LV[tab],arr=D[tab],m={},order=[];
+  idx.forEach(function(i){var r=arr[i],c=r[L.c],k=gkey(c,r[L.n]);
+    if(!m[k]){m[k]={code:c,name:r[L.n],unit:L.u<0?(G.unit[c]||''):r[L.u],sum:0};order.push(k)}
+    m[k].sum+=r[L.q]});
+  return order.map(function(k){return m[k]});
+}
+var COPYBTNS='<div class="cbtns"><button class="copybtn" data-copy="short" data-label="Копировать кратко">Копировать кратко</button><button class="copybtn alt" data-copy="full" data-label="Копировать подробно">Копировать подробно</button></div>';
+function normalCopyHead(tab,idx,statH){
+  /* обычный поиск (по названию и т.п.): две кнопки копирования по ВСЕМ найденным материалам, таблицы строятся при нажатии */
+  var items=summarize(tab,idx),L=LV[tab],mc={},found=[];
+  items.forEach(function(it){if(!/без\s*кода/i.test(it.code)&&!mc[it.code]){mc[it.code]=it;found.push(it.code)}});
+  S.copyShort=function(){return shortTable(items,L)};
+  S.copyFull=function(){return fullTable(found,mc)};
+  return '<div class="lhead">'+statH+COPYBTNS+'</div>';
 }
 function fullTable(found,m){
   /* подробно: сверху свод (код, наименование, ед. изм., доступный запас), ниже отдельными блоками «Склады» и «Резервы цехов» */
@@ -653,9 +669,13 @@ function listHead(tab,idx,P){
   var found=P.order.filter(function(c){return m[c]}),miss=P.order.filter(function(c){return !m[c]});
   if(tab==='me'){
     var pos={};P.order.forEach(function(c,i){pos[c]=i});
-    S.copyText=buildTable('me',idx.slice().sort(function(a,b){return (pos[D.me[a][3]]-pos[D.me[b][3]])||meSort(a,b)}),true);
+    S.copyText=function(){return buildTable('me',idx.slice().sort(function(a,b){return (pos[D.me[a][3]]-pos[D.me[b][3]])||meSort(a,b)}),true)};
     S.copyN=idx.length;
-  }else{S.copyShort=shortTable(found,m,L);S.copyFull=fullTable(found,m);S.copyN=found.length}
+  }else{
+    S.copyShort=function(){return shortTable(found.map(function(c){return {code:c,name:m[c].name,unit:m[c].unit,sum:m[c].sum}}),L)};
+    S.copyFull=function(){return fullTable(found,m)};
+    S.copyN=found.length;
+  }
   var h='<div class="lhead"><div class="stat">'+(P.order.length===1?'Код <b>'+esc(P.order[0])+'</b>: '+(found.length?'найден':'нет в этой вкладке'):'По перечню: <b>'+P.order.length+'</b> кодов · найдено: <b>'+found.length+'</b> · нет в этой вкладке: <b>'+miss.length+'</b>')+'</div>'+
     (found.length?(tab==='me'?'<button class="copybtn" data-copy="1" data-label="Скопировать для Excel">Скопировать для Excel</button>':'<div class="cbtns"><button class="copybtn" data-copy="short" data-label="Копировать кратко">Копировать кратко</button><button class="copybtn alt" data-copy="full" data-label="Копировать подробно">Копировать подробно</button></div>'):'')+'</div>';
   if(miss.length){
@@ -699,8 +719,8 @@ function renderMain(C){
     for(var k=0;k<shown;k++){var x=items[k];html+=tab==='inc'?incCard(x,toks):tab==='iss'?issCard(x,toks):totCard(x,toks)}
     stat='<div class="stat">Позиций: <b>'+fmt(items.length)+'</b></div>';
   }
-  var withCopy=tab==='me'||(sec==='bms'&&(tab==='res'||tab==='vir'));
-  html=(P.codes?lh:(withCopy?tableHead(stat,tab,idx):stat))+html;
+  var withCopy=tab==='me'||(sec==='bms'&&(tab==='res'||tab==='vir')),twoBtn=sec==='bms'&&(tab==='bal'||tab==='tot');
+  html=(P.codes?lh:(twoBtn?normalCopyHead(tab,idx,stat):(withCopy?tableHead(stat,tab,idx):stat)))+html;
   if(shown<items.length)html+='<button class="more" data-more="1">Показать ещё ('+fmt(items.length-shown)+')</button>';
   $main.innerHTML=html;
 }
@@ -771,7 +791,7 @@ $main.addEventListener('click',function(e){
     render();window.scrollTo(0,0);return;
   }
   var cp=t.closest('[data-copy]');
-  if(cp){var kind=cp.getAttribute('data-copy');copyText(kind==='short'?S.copyShort:kind==='full'?S.copyFull:(S.copyText||''),cp);return}
+  if(cp){var kind=cp.getAttribute('data-copy'),src=kind==='short'?S.copyShort:kind==='full'?S.copyFull:S.copyText;copyText(typeof src==='function'?src():(src||''),cp);return}
   var wt=t.closest('[data-whtoggle]');
   if(wt){var wk=wt.getAttribute('data-whtoggle');S.open[wk]=!S.open[wk];wt.parentNode.classList.toggle('open',!!S.open[wk]);return}
   var mm=t.closest('[data-mebmore]');
