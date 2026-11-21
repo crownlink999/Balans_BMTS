@@ -1,0 +1,17 @@
+{
+  "name": "Баланс БМТС",
+  "short_name": "Баланс",
+  "description": "Поиск материалов по балансу склада БМТС",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EDF2F5",
+  "theme_color": "#0E6F78",
+  "lang": "ru",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
