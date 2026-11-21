@@ -273,7 +273,7 @@ function gkey(code,name){return /без\s*кода/i.test(code)?'без кода
 
 var CFG={res:{c:4,n:5,u:6,q:7},bal:{c:0,n:1,u:2,q:4},vir:{c:0,n:1,u:2,q:4},me:{c:3,n:4,u:5,q:8}};
 var D=null,H={},F={},Y={},G={},MEBY={},RESBY={},BALSUM={},BALBY={};
-var APP_BUILD={v:'7',t:'21.11.2026 07:16'};
+var APP_BUILD={v:'8',t:'21.11.2026 13:54'};
 var S={sec:'bms',tab:'bal',q:{me:'',bms:''},plans:{},rem:'',years:{},shop:'',shopRes:'',yOpen:false,limit:50,open:{},unfold:{}};
 try{var sv=localStorage.getItem('bmts_sec');if(sv==='me'||sv==='bms')S.sec=sv}catch(e){}
 var $q=document.getElementById('q'),$clr=document.getElementById('clr'),$main=document.getElementById('main'),
@@ -598,8 +598,18 @@ function buildTable(tab,idx,keepOrder){
   }else{
     rows=[['Цех','Плановик','Принимающий склад','Резервирование','Код материала','Наименование','Ед. изм.','Объём потребности','Сокращ. количество','Размер разницы','Вид движения','Дата потребности','В наличии (баланс)']];
     idx.forEach(function(i){var r=D.res[i];rows.push([r[0],r[1],r[2],r[3],r[4],r[5],r[6],tnum(r[7]),tnum(r[8]),tnum(r[9]),r[10],fdate(r[11]),BALSUM[r[4]]>0?tnum(BALSUM[r[4]]):'0'])});
+    rows=dropEmptyCols(rows);
   }
   return rows.map(function(r){return r.map(tcell).join('\t')}).join('\n');
+}
+function dropEmptyCols(rows){
+  /* убирает колонки, в которых ни в одной строке данных нет значения (заголовок — первая строка) */
+  var keep=[];
+  for(var j=0;j<rows[0].length;j++){
+    var has=false;for(var i=1;i<rows.length;i++){if(tcell(rows[i][j])!==''){has=true;break}}
+    if(has)keep.push(j);
+  }
+  return rows.map(function(r){return keep.map(function(j){return r[j]})});
 }
 function tableHead(statH,tab,idx){
   S.copyText=buildTable(tab,idx);S.copyN=idx.length;
@@ -626,22 +636,13 @@ function fullTable(found,m){
     line(['Код материала','Наименование','Склад (зона)','Партия','Дата оприходования','Доступный запас','Ед. изм.','Примечание']);
     wr.forEach(line);
   }
-  var rr=[],hasPlan=false,hasNo=false,hasWh=false;
-  found.forEach(function(c){(RESBY[c]||[]).forEach(function(i){var r=D.res[i];if(r[1])hasPlan=true;if(r[3])hasNo=true;if(r[2])hasWh=true;rr.push([c,m[c].name,r])})});
+  var rr=[];
+  found.forEach(function(c){(RESBY[c]||[]).forEach(function(i){rr.push([c,m[c].name,D.res[i]])})});
   if(rr.length){
     out.push('');line(['РЕЗЕРВЫ ЦЕХОВ']);
-    var hdr=['Код материала','Наименование','Цех'];
-    if(hasPlan)hdr.push('Плановик');
-    hdr=hdr.concat(['Объём потребности','Сокращ. количество','Размер разницы','Ед. изм.','Дата потребности','Вид движения']);
-    if(hasWh)hdr.push('Принимающий склад');
-    if(hasNo)hdr.push('Резервирование');
-    line(hdr);
-    rr.forEach(function(x){var r=x[2],row=[x[0],x[1],r[0]];
-      if(hasPlan)row.push(r[1]);
-      row=row.concat([tnum(r[7]),tnum(r[8]),tnum(r[9]),r[6],fdate(r[11]),r[10]]);
-      if(hasWh)row.push(r[2]);
-      if(hasNo)row.push(r[3]);
-      line(row)});
+    var tbl=[['Код материала','Наименование','Цех','Плановик','Объём потребности','Сокращ. количество','Размер разницы','Ед. изм.','Дата потребности','Вид движения','Принимающий склад','Резервирование']];
+    rr.forEach(function(x){var r=x[2];tbl.push([x[0],x[1],r[0],r[1],tnum(r[7]),tnum(r[8]),tnum(r[9]),r[6],fdate(r[11]),r[10],r[2],r[3]])});
+    dropEmptyCols(tbl).forEach(line);
   }
   return out.join('\n');
 }
